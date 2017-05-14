@@ -10,7 +10,7 @@ var Keycode = {
 };
 
 class Input {
-	constructor(mouseCallback) {
+	constructor(canvas, mouseCallback) {
 		var self = this;
 		this._keys = new Set();
 
@@ -27,6 +27,9 @@ class Input {
 		};
 
 		document.onkeydown = function(e) {
+			if (e.which === 192) {
+				canvas.webkitRequestFullscreen();
+			}
 			self._keys.add(e.which);
 		};
 
