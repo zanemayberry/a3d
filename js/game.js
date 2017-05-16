@@ -14,22 +14,24 @@ class Game {
 		this._tick = Date.now();
 		this._ground = []; // ZANETODO: hacky ground. needs to be a class.
 		this._player = new Player(this._camera, this._ground);
+		this._player.obj.position.y += 1;
 		this._scene.add(this._player.obj);
 		var canvas = this._renderer.domElement;
 		this._input = new Input(canvas, function(e) { self._player.mouseLook(e); });
 
 		this._renderer.setSize(Width, Height);
-		this._renderer.shadowMapEnabled = true;
-		this._scene.background = new THREE.Color(0xffffff);
+		// this._renderer.shadowMapType = THREE.PCFSoftShadowMap;
+		// this._renderer.shadowMapEnabled = true;
+		this._scene.background = new THREE.Color(0xf9f9ff);
 		document.body.appendChild(canvas);
 
 		this._renderer.domElement.onclick = function() {
 			this.requestPointerLock();
 		};
 
-		this.debug_addCube(-3, 0, 0, 0xff0000);
-		this.debug_addCube(0, 3, 0, 0x00ff00);
-		this.debug_addCube(0, 0, -3, 0x0000ff);
+		// this.debug_addCube(-3, 0, 0, 0xff0000);
+		// this.debug_addCube(0, 3, 0, 0x00ff00);
+		// this.debug_addCube(0, 0, -3, 0x0000ff);
 
 		this.debug_addGround();
 
@@ -39,15 +41,35 @@ class Game {
 		var directionalLight = new THREE.DirectionalLight(0xffffff, 0.5, 100);
 		this._lightArm = new THREE.Object3D();
 		this._lightArm.add(directionalLight);
-		directionalLight.position.set(0, 20, 20);
-		directionalLight.castShadow = true;
+		directionalLight.position.set(0, 40, 40);
+		// directionalLight.castShadow = true;
 		this._scene.add(this._lightArm);
 
 		var ground = new THREE.PlaneGeometry(60, 60, 199, 199);
-		var material = new THREE.MeshLambertMaterial({color: 0x2222ee, transparent: true, opacity: 0.5});
+		var material = new THREE.MeshLambertMaterial({color: 0x9999f3, transparent: true, opacity: 0.5});
 		var plane = new THREE.Mesh(ground, material);
 		plane.rotation.x = -Math.PI / 2;
 		this._scene.add(plane);
+
+		var loader = new THREE.ColladaLoader();
+		loader.options.convertUpAxis = true;
+		loader.setPreferredShading(THREE.SmoothShading);
+		loader.load(
+			'resources/models/teepee.dae',
+			function(collada) {
+				var teepee = collada.scene.children[0];
+				teepee.traverse (function(child) {
+					if (child instanceof THREE.Mesh) {
+						// child.castShadow = true;
+					}
+				});
+				teepee.position.z += 5;
+				teepee.position.y += .5;
+				// teepee.castShadow = true;
+				self._scene.add(teepee);
+				console.log(teepee);
+			}
+		);
 	}
 
 	debug_addCube(x, y, z, color) {
@@ -57,7 +79,7 @@ class Game {
 		cube.position.x = x;
 		cube.position.y = y;
 		cube.position.z = z;
-		cube.castShadow = true;
+		// cube.castShadow = true;
 		this._scene.add(cube);
 	}
 
@@ -65,13 +87,14 @@ class Game {
 		for (var i = 0; i < 200; i++) {
 			for (var j = 0; j < 200; j++) {
 				var cell = i * 200 + j;
-				this._ground[cell] = (cell / 20000) * (cell / 20000) - 1.5 + Math.random() / 10;
+				this._ground[cell] = (cell / 20000) * (cell / 20000) - .5 + Math.random() / 10;
 			}
 		}
 
 		var geometry = new THREE.PlaneGeometry(60, 60, 199, 199);
 		var material = new THREE.MeshLambertMaterial({
 			color: 0xffee99,
+			// color: 0x000000,
 			wireframe: false
 		});
 		for (var i = 0, l = geometry.vertices.length; i < l; i++) {
@@ -79,9 +102,11 @@ class Game {
 		}
 		geometry.computeFaceNormals();
 		geometry.computeVertexNormals();
-		var plane = new THREE.Mesh(geometry, material);
+		var bufferGeometry = new THREE.BufferGeometry();
+		bufferGeometry.fromGeometry(geometry);
+		var plane = new THREE.Mesh(bufferGeometry, material);
 		plane.rotation.x = -Math.PI / 2;
-		plane.receiveShadow = true;
+		// plane.receiveShadow = true;
 		this._scene.add(plane);
 	}
 

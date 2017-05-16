@@ -50,17 +50,17 @@ class Player {
 	update(input, delta) {
 		this._obj.position.y = .9 * this._obj.position.y + .1 * this.calcY();
 
-		if (input.test(Keycode.W)) {
-			this._obj.translateZ(-delta);
+		if (input.test(Keycode.W) || input.test(Keycode.LMB)) {
+			this._obj.translateZ(-2 * delta);
 		}
 		if (input.test(Keycode.A)) {
-			this._obj.translateX(-delta);
+			this._obj.translateX(-2 * delta);
 		}
-		if (input.test(Keycode.S)) {
-			this._obj.translateZ(delta);
+		if (input.test(Keycode.S) || input.test(Keycode.RMB)) {
+			this._obj.translateZ(2 * delta);
 		}
 		if (input.test(Keycode.D)) {
-			this._obj.translateX(delta);
+			this._obj.translateX(2 * delta);
 		}
 		// if (input.test(Keycode.Space) && this._obj.position.y <= Ground) {
 		// 	this._velY = JumpVel;

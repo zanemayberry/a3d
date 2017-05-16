@@ -6,7 +6,9 @@ var Keycode = {
 	S: 83,
 	D: 68,
 	Space: 32,
-	R: 82
+	R: 82,
+	LMB: 1,
+	RMB: 3
 };
 
 class Input {
