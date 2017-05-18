@@ -1,130 +1,134 @@
 "use strict";
 
-// var width = window.innerWidth;
-// var height = window.innerHeight;
 var Width = 1680;
 var Height = 1050;
+// var LightSpeed = 1/100;
+var LightSpeed = 1/5;
+var Zero = new THREE.Vector2();
+
+// ZANETODO: get rid of hacky static stuff
+// This'll have to go in its own class...
+// probably belongs in grid?
+// except for last click. maybe.
+var intersected = undefined;
+var lastColor = undefined;
+var lastClick = 0;
 
 class Game {
 	constructor() {
 		var self = this;
+
+		// Set up the scene
 		this._scene = new THREE.Scene();
-		this._camera = new THREE.PerspectiveCamera(75, Width / Height, 0.1, 1000);
-		this._renderer = new THREE.WebGLRenderer();
-		this._tick = Date.now();
-		this._ground = []; // ZANETODO: hacky ground. needs to be a class.
-		this._player = new Player(this._camera, this._ground);
-		this._player.obj.position.y += 1;
-		this._scene.add(this._player.obj);
-		var canvas = this._renderer.domElement;
-		this._input = new Input(canvas, function(e) { self._player.mouseLook(e); });
-
-		this._renderer.setSize(Width, Height);
-		// this._renderer.shadowMapType = THREE.PCFSoftShadowMap;
-		// this._renderer.shadowMapEnabled = true;
 		this._scene.background = new THREE.Color(0xf9f9ff);
-		document.body.appendChild(canvas);
 
-		this._renderer.domElement.onclick = function() {
+		// Add the renderer
+		this._renderer = new THREE.WebGLRenderer();
+		var canvas = this._renderer.domElement;
+		canvas.onclick = function() {
 			this.requestPointerLock();
 		};
+		this._renderer.setSize(Width, Height);
+		document.body.appendChild(canvas);
 
-		// this.debug_addCube(-3, 0, 0, 0xff0000);
-		// this.debug_addCube(0, 3, 0, 0x00ff00);
-		// this.debug_addCube(0, 0, -3, 0x0000ff);
+		this._tick = Date.now(); // ZANETODO: use the built-in three.js clock
 
-		this.debug_addGround();
+		// Add the camera
+		this._cameraController = new CameraController(new THREE.PerspectiveCamera(75, Width / Height, 0.1, 1000));
+		this._scene.add(this._cameraController.obj);
 
+		// Add the input
+		this._input = new Input(canvas, function(e) { self._cameraController.mouseLook(e); });
+
+		// Add the grid
+		this._grid = new Grid(10, 10, 10);
+		this._scene.add(this._grid.obj);
+
+		// Add some ambient light
 		var ambientLight = new THREE.AmbientLight(0x404040);
 		this._scene.add(ambientLight);
 
+		// Add the sun
 		var directionalLight = new THREE.DirectionalLight(0xffffff, 0.5, 100);
 		this._lightArm = new THREE.Object3D();
 		this._lightArm.add(directionalLight);
 		directionalLight.position.set(0, 40, 40);
-		// directionalLight.castShadow = true;
 		this._scene.add(this._lightArm);
 
-		var ground = new THREE.PlaneGeometry(60, 60, 199, 199);
-		var material = new THREE.MeshLambertMaterial({color: 0x9999f3, transparent: true, opacity: 0.5});
+		// Add the ground
+		var ground = new THREE.PlaneGeometry(60, 60, 60, 60);
+		var material = new THREE.MeshLambertMaterial({color: 0xaaaadd, wireframe: true});
 		var plane = new THREE.Mesh(ground, material);
 		plane.rotation.x = -Math.PI / 2;
+		plane.position.x = -0.5;
+		plane.position.y = -0.5;
+		plane.position.z = -0.5;
 		this._scene.add(plane);
 
-		var loader = new THREE.ColladaLoader();
-		loader.options.convertUpAxis = true;
-		loader.setPreferredShading(THREE.SmoothShading);
-		loader.load(
-			'resources/models/teepee.dae',
-			function(collada) {
-				var teepee = collada.scene.children[0];
-				teepee.traverse (function(child) {
-					if (child instanceof THREE.Mesh) {
-						// child.castShadow = true;
-					}
-				});
-				teepee.position.z += 5;
-				teepee.position.y += .5;
-				// teepee.castShadow = true;
-				self._scene.add(teepee);
-				console.log(teepee);
-			}
-		);
-	}
+		// Add a cube
+		this._grid.add(0, 0, 0);
 
-	debug_addCube(x, y, z, color) {
-		var geometry = new THREE.BoxGeometry(1, 1, 1);
-		var material = new THREE.MeshLambertMaterial({color: color});
-		var cube = new THREE.Mesh(geometry, material);
-		cube.position.x = x;
-		cube.position.y = y;
-		cube.position.z = z;
-		// cube.castShadow = true;
-		this._scene.add(cube);
-	}
-
-	debug_addGround() {
-		for (var i = 0; i < 200; i++) {
-			for (var j = 0; j < 200; j++) {
-				var cell = i * 200 + j;
-				this._ground[cell] = (cell / 20000) * (cell / 20000) - .5 + Math.random() / 10;
-			}
-		}
-
-		var geometry = new THREE.PlaneGeometry(60, 60, 199, 199);
-		var material = new THREE.MeshLambertMaterial({
-			color: 0xffee99,
-			// color: 0x000000,
-			wireframe: false
-		});
-		for (var i = 0, l = geometry.vertices.length; i < l; i++) {
-			geometry.vertices[i].z = this._ground[i];
-		}
-		geometry.computeFaceNormals();
-		geometry.computeVertexNormals();
-		var bufferGeometry = new THREE.BufferGeometry();
-		bufferGeometry.fromGeometry(geometry);
-		var plane = new THREE.Mesh(bufferGeometry, material);
-		plane.rotation.x = -Math.PI / 2;
-		// plane.receiveShadow = true;
-		this._scene.add(plane);
+		// Add the raycaster
+		this._raycaster = new THREE.Raycaster();
 	}
 
 	update() {
 		var curTick = Date.now();
 		var delta = (curTick - this._tick) / 1000;
+		var deltaClick = (curTick - lastClick) / 1000;
 		this._tick = curTick;
-		this._lightArm.rotation.y += delta / 100;
+		this._lightArm.rotation.y += LightSpeed * delta;
+		this._cameraController.update(this._input, delta);
 
-		this._player.update(this._input, delta);
+		this._raycaster.setFromCamera(Zero, this._cameraController.camera);
+		var intersects = this._raycaster.intersectObjects(this._grid.obj.children);
+		if (intersects.length > 0) {
+			if (intersected) {
+				intersected.face.color.copy(lastColor);
+				var n = intersected.face.normal;
+				for (var i = 0; i < 12; i++) {
+					var f = intersected.object.geometry.faces[i];
+					if (n.equals(f.normal)) {
+						f.color.copy(lastColor);
+					}
+				}
+				intersected.object.geometry.colorsNeedUpdate = true;
+			}
+			intersected = intersects[0];
+			lastColor = new THREE.Color();
+			lastColor.copy(intersected.face.color);
+			intersected.face.color.copy(new THREE.Color("#ff0000"));
+			var n = intersected.face.normal;
+			for (var i = 0; i < 12; i++) {
+				var f = intersected.object.geometry.faces[i];
+				if (n.equals(f.normal)) {
+					f.color.copy(new THREE.Color("#ff0000"));
+				}
+			}
+			intersected.object.geometry.colorsNeedUpdate = true;
+		}
+
+		if (this._input.test(Keycode.Mouse0) && intersected && deltaClick > 0.3) {
+			var vec = new THREE.Vector3();
+			vec.addVectors(intersected.object.position, intersected.face.normal);
+			this._grid.add(vec.x, vec.y, vec.z);
+			lastClick = curTick;
+		}
+		if (this._input.test(Keycode.Mouse1) && intersected && deltaClick > 0.3) {
+			var pos = intersected.object.position;
+			this._grid.remove(pos.x, pos.y, pos.z);
+			intersected = undefined;
+			lastClick = curTick;
+		}
 	}
 
 	draw() {
-		this._renderer.render(this._scene, this._camera);
+		this._renderer.render(this._scene, this._cameraController.camera);
 	}
 
 	loop() {
-		// ZANETODO: figure out something better than this closure.
+		// ZANETODO: closure looks weird, but I think the
+		// only way around it would require a global static
 		var self = this;
 		requestAnimationFrame(function() { self.loop(); });
 		this.update();

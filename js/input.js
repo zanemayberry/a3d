@@ -7,8 +7,10 @@ var Keycode = {
 	D: 68,
 	Space: 32,
 	R: 82,
-	LMB: 1,
-	RMB: 3
+	Mouse0: 1,
+	Mouse1: 3,
+	Shift: 16,
+	Ctrl: 17,
 };
 
 class Input {
